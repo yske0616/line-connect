@@ -1,0 +1,223 @@
+const ghlService = require('./ghl');
+const lineService = require('./line');
+const contactModel = require('../models/contact');
+const triggerSubModel = require('../models/trigger-subscription');
+const logModel = require('../models/log');
+
+const LINE_FRIEND_TAG = 'LINE友だち';
+
+/**
+ * Handle a LINE follow event (friend added)
+ * 1. Get LINE user profile
+ * 2. Find or create GHL contact
+ * 3. Save line_uid mapping
+ * 4. Add "LINE友だち" tag
+ * 5. Fire GHL custom trigger "line_friend_added"
+ */
+async function handleFollow(locationId, lineAccessToken, userId, timestamp) {
+  console.log(`[ContactMapper] Follow event: location=${locationId}, user=${userId}`);
+
+  // 1. Get LINE user profile
+  let profile;
+  try {
+    profile = await lineService.getUserProfile(lineAccessToken, userId);
+  } catch (err) {
+    console.error('[ContactMapper] Failed to get LINE profile:', err.message);
+    profile = { userId, displayName: `LINE User ${userId.slice(-4)}`, pictureUrl: null };
+  }
+
+  const { displayName, pictureUrl } = profile;
+
+  // 2. Check if we already have this LINE user mapped
+  let lineContact = await contactModel.findByLineUid(locationId, userId);
+  let ghlContactId = lineContact?.ghl_contact_id;
+
+  // 3. If not mapped, try to find existing GHL contact or create one
+  if (!ghlContactId) {
+    // Try to find by existing contact (no email/phone for LINE follow - create new)
+    try {
+      const nameParts = displayName.split(' ');
+      const firstName = nameParts[0] || displayName;
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      const newContact = await ghlService.createContact(locationId, {
+        firstName,
+        lastName,
+        tags: [LINE_FRIEND_TAG],
+        customFields: [{ key: 'line_uid', field_value: userId }],
+      });
+
+      ghlContactId = newContact.id || newContact.contact?.id;
+      console.log(`[ContactMapper] Created GHL contact: ${ghlContactId}`);
+    } catch (err) {
+      console.error('[ContactMapper] Failed to create GHL contact:', err.message);
+    }
+  } else {
+    // Update existing contact: add tag + update line_uid field
+    try {
+      await ghlService.addTags(locationId, ghlContactId, [LINE_FRIEND_TAG]);
+      await ghlService.updateCustomFields(locationId, ghlContactId, [
+        { key: 'line_uid', field_value: userId },
+      ]);
+    } catch (err) {
+      console.error('[ContactMapper] Failed to update GHL contact:', err.message);
+    }
+  }
+
+  // 4. Save/update the LINE contact mapping
+  lineContact = await contactModel.create({
+    locationId,
+    ghlContactId,
+    lineUid: userId,
+    displayName,
+    pictureUrl,
+  });
+
+  // 5. Log the event
+  await logModel.create({
+    locationId,
+    direction: 'inbound',
+    lineUid: userId,
+    ghlContactId,
+    messageType: 'follow',
+    content: `Friend added: ${displayName}`,
+    status: 'received',
+  });
+
+  // 6. Fire "LINE Friend Added" custom trigger in GHL workflows
+  await fireCustomTrigger(locationId, 'line_friend_added', {
+    userId,
+    displayName,
+    pictureUrl,
+    contactId: ghlContactId,
+    timestamp,
+    sourceType: 'user',
+  });
+
+  return { lineContact, ghlContactId };
+}
+
+/**
+ * Handle a LINE message received event
+ * 1. Find or create GHL contact mapping
+ * 2. Fire GHL custom trigger "line_message_received"
+ */
+async function handleMessage(locationId, lineAccessToken, userId, messageText, replyToken, timestamp) {
+  console.log(`[ContactMapper] Message event: location=${locationId}, user=${userId}`);
+
+  // 1. Find existing contact mapping
+  let lineContact = await contactModel.findByLineUid(locationId, userId);
+  let ghlContactId = lineContact?.ghl_contact_id;
+
+  // 2. If no mapping exists, fetch profile and create contact (in case follow event was missed)
+  if (!lineContact) {
+    let profile;
+    try {
+      profile = await lineService.getUserProfile(lineAccessToken, userId);
+    } catch {
+      profile = { userId, displayName: `LINE User ${userId.slice(-4)}`, pictureUrl: null };
+    }
+
+    const { displayName, pictureUrl } = profile;
+
+    try {
+      const nameParts = displayName.split(' ');
+      const newContact = await ghlService.createContact(locationId, {
+        firstName: nameParts[0] || displayName,
+        lastName: nameParts.slice(1).join(' ') || '',
+        tags: [LINE_FRIEND_TAG],
+        customFields: [{ key: 'line_uid', field_value: userId }],
+      });
+      ghlContactId = newContact.id || newContact.contact?.id;
+    } catch (err) {
+      console.error('[ContactMapper] Failed to create contact for message:', err.message);
+    }
+
+    lineContact = await contactModel.create({
+      locationId,
+      ghlContactId,
+      lineUid: userId,
+      displayName,
+      pictureUrl,
+    });
+  }
+
+  // 3. Log the message
+  await logModel.create({
+    locationId,
+    direction: 'inbound',
+    lineUid: userId,
+    ghlContactId,
+    messageType: 'text',
+    content: messageText,
+    status: 'received',
+  });
+
+  // 4. Fire "LINE Message Received" custom trigger
+  await fireCustomTrigger(locationId, 'line_message_received', {
+    userId,
+    displayName: lineContact?.display_name || userId,
+    messageText,
+    contactId: ghlContactId,
+    timestamp,
+    sourceType: 'user',
+  });
+
+  return { lineContact, ghlContactId };
+}
+
+/**
+ * Handle LINE unfollow/block event
+ */
+async function handleUnfollow(locationId, userId, timestamp) {
+  console.log(`[ContactMapper] Unfollow event: location=${locationId}, user=${userId}`);
+
+  const lineContact = await contactModel.markBlocked(locationId, userId);
+
+  if (lineContact?.ghl_contact_id) {
+    try {
+      await ghlService.removeTags(locationId, lineContact.ghl_contact_id, [LINE_FRIEND_TAG]);
+    } catch (err) {
+      console.error('[ContactMapper] Failed to remove tag on unfollow:', err.message);
+    }
+  }
+
+  await logModel.create({
+    locationId,
+    direction: 'inbound',
+    lineUid: userId,
+    ghlContactId: lineContact?.ghl_contact_id,
+    messageType: 'unfollow',
+    content: 'User unfollowed/blocked',
+    status: 'received',
+  });
+}
+
+/**
+ * Fire all active GHL custom trigger subscriptions for a given trigger key
+ */
+async function fireCustomTrigger(locationId, triggerKey, payload) {
+  const subscriptions = await triggerSubModel.findActive(locationId, triggerKey);
+
+  if (subscriptions.length === 0) {
+    console.log(`[ContactMapper] No active subscriptions for ${triggerKey} on location ${locationId}`);
+    return;
+  }
+
+  console.log(`[ContactMapper] Firing ${triggerKey} to ${subscriptions.length} subscription(s)`);
+
+  for (const sub of subscriptions) {
+    try {
+      await ghlService.fireTrigger(sub.target_url, {
+        type: triggerKey,
+        locationId,
+        ...payload,
+      });
+      console.log(`[ContactMapper] Fired trigger to: ${sub.target_url}`);
+    } catch (err) {
+      console.error(`[ContactMapper] Failed to fire trigger ${sub.trigger_id}:`, err.message);
+    }
+  }
+}
+
+module.exports = { handleFollow, handleMessage, handleUnfollow };

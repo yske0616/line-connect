@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LINE Connect — 設定</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f8f9fa;
+      color: #1a1a1a;
+      padding: 24px;
+      min-height: 100vh;
+    }
+    .container { max-width: 680px; margin: 0 auto; }
+
+    /* Header */
+    .header {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 28px;
+    }
+    .header .logo {
+      width: 40px; height: 40px; background: #06C755;
+      border-radius: 10px; display: flex; align-items: center;
+      justify-content: center; font-size: 20px;
+    }
+    .header h1 { font-size: 22px; font-weight: 700; color: #1a1a1a; }
+    .header p { font-size: 13px; color: #666; margin-top: 2px; }
+
+    /* Cards */
+    .card {
+      background: white; border-radius: 12px;
+      border: 1px solid #e8e8e8;
+      padding: 24px; margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 14px; font-weight: 600; color: #666;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 16px;
+    }
+
+    /* Status badge */
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 20px;
+      font-size: 12px; font-weight: 500;
+    }
+    .status-badge.connected { background: #e8f7ec; color: #1a7a3a; }
+    .status-badge.disconnected { background: #fff0f0; color: #c0392b; }
+    .status-badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .status-badge.connected .dot { background: #06C755; }
+    .status-badge.disconnected .dot { background: #e74c3c; }
+
+    /* Form */
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block; font-size: 13px; font-weight: 500;
+      color: #444; margin-bottom: 6px;
+    }
+    .form-group input {
+      width: 100%; padding: 10px 12px;
+      border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 14px; outline: none; transition: border-color 0.2s;
+      font-family: monospace;
+    }
+    .form-group input:focus { border-color: #06C755; }
+    .form-group input.error { border-color: #e74c3c; }
+
+    /* Webhook URL box */
+    .webhook-box {
+      background: #f5f5f5; border: 1px solid #e0e0e0;
+      border-radius: 8px; padding: 12px 14px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .webhook-box code {
+      flex: 1; font-size: 12px; color: #444;
+      word-break: break-all; font-family: monospace;
+    }
+    .copy-btn {
+      flex-shrink: 0; padding: 5px 10px;
+      background: #fff; border: 1px solid #ddd;
+      border-radius: 6px; cursor: pointer; font-size: 12px;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover { background: #f0f0f0; }
+    .copy-btn.copied { background: #e8f7ec; border-color: #06C755; color: #1a7a3a; }
+
+    /* Buttons */
+    .btn {
+      padding: 10px 20px; border-radius: 8px; font-size: 14px;
+      font-weight: 500; cursor: pointer; border: none;
+      transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: #06C755; color: white; }
+    .btn-primary:hover:not(:disabled) { background: #05b34c; }
+    .btn-secondary { background: #f0f0f0; color: #444; }
+    .btn-secondary:hover:not(:disabled) { background: #e0e0e0; }
+    .btn-danger { background: #fff0f0; color: #c0392b; }
+    .btn-danger:hover:not(:disabled) { background: #ffe0e0; }
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+    /* Stats */
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .stat-item { text-align: center; padding: 12px; background: #fafafa;
+                 border-radius: 8px; border: 1px solid #eee; }
+    .stat-value { font-size: 24px; font-weight: 700; color: #06C755; }
+    .stat-label { font-size: 11px; color: #888; margin-top: 2px; }
+
+    /* Alert */
+    .alert {
+      padding: 12px 16px; border-radius: 8px; font-size: 13px;
+      margin-bottom: 16px; display: flex; align-items: flex-start; gap: 8px;
+    }
+    .alert-success { background: #e8f7ec; color: #1a7a3a; border: 1px solid #b8dfc3; }
+    .alert-error { background: #fff0f0; color: #c0392b; border: 1px solid #f5c6c6; }
+    .alert-info { background: #e8f3ff; color: #1a4fa0; border: 1px solid #b8d0f5; }
+
+    /* Logs table */
+    .logs-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .logs-table th {
+      text-align: left; padding: 8px 10px; background: #f5f5f5;
+      border-bottom: 1px solid #eee; color: #666; font-weight: 500;
+    }
+    .logs-table td { padding: 8px 10px; border-bottom: 1px solid #f5f5f5; }
+    .logs-table tr:hover td { background: #fafafa; }
+    .direction-badge {
+      font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 500;
+    }
+    .direction-in { background: #e8f3ff; color: #1a4fa0; }
+    .direction-out { background: #e8f7ec; color: #1a7a3a; }
+    .status-sent { color: #1a7a3a; }
+    .status-failed { color: #c0392b; }
+    .status-received { color: #1a4fa0; }
+
+    /* Loading spinner */
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white; border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Section divider */
+    .divider { border: none; border-top: 1px solid #eee; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="container">
+
+      <!-- Header -->
+      <div class="header">
+        <div class="logo">🟢</div>
+        <div>
+          <h1>LINE Connect</h1>
+          <p>GoHighLevel × LINE Messaging API</p>
+        </div>
+      </div>
+
+      <!-- Loading state -->
+      <div v-if="loading" class="card" style="text-align:center; padding:40px;">
+        <div style="font-size:32px; margin-bottom:12px;">⏳</div>
+        <p style="color:#666;">Loading settings...</p>
+      </div>
+
+      <!-- Error state -->
+      <div v-else-if="initError" class="card">
+        <div class="alert alert-error">
+          <span>⚠️</span>
+          <div>
+            <strong>Setup Error:</strong> {{ initError }}<br>
+            <small>Please try refreshing the page or reinstalling the app.</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main content -->
+      <template v-else>
+
+        <!-- Status Card -->
+        <div class="card">
+          <div class="card-title">接続ステータス</div>
+
+          <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:16px;">
+            <div>
+              <div style="font-size:11px; color:#888; margin-bottom:4px;">GoHighLevel</div>
+              <span class="status-badge connected">
+                <span class="dot"></span> 接続済み
+              </span>
+            </div>
+            <div>
+              <div style="font-size:11px; color:#888; margin-bottom:4px;">LINE Channel</div>
+              <span :class="['status-badge', status.lineConnected ? 'connected' : 'disconnected']">
+                <span class="dot"></span>
+                {{ status.lineConnected ? '接続済み' : '未接続' }}
+              </span>
+            </div>
+          </div>
+
+          <div v-if="status.lineConnected" class="stats">
+            <div class="stat-item">
+              <div class="stat-value">{{ status.friendsCount.toLocaleString() }}</div>
+              <div class="stat-label">友だち数</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">{{ status.channelId || '—' }}</div>
+              <div class="stat-label">Channel ID</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">{{ formatRelativeTime(status.lastWebhookAt) }}</div>
+              <div class="stat-label">最終Webhook</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LINE Configuration Card -->
+        <div class="card">
+          <div class="card-title">LINE公式アカウント接続設定</div>
+
+          <div v-if="saveSuccess" class="alert alert-success">
+            ✅ LINE接続設定を保存しました。LINE DevelopersでWebhook URLを設定してください。
+          </div>
+          <div v-if="saveError" class="alert alert-error">
+            ⚠️ {{ saveError }}
+          </div>
+
+          <div class="form-group">
+            <label>Channel ID</label>
+            <input
+              v-model="form.channelId"
+              type="text"
+              placeholder="例: 2009584594"
+              :class="{ error: formErrors.channelId }"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Channel Secret</label>
+            <input
+              v-model="form.channelSecret"
+              type="password"
+              placeholder="32文字の英数字"
+              :class="{ error: formErrors.channelSecret }"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Channel Access Token</label>
+            <input
+              v-model="form.accessToken"
+              type="password"
+              placeholder="Long-lived access token"
+              :class="{ error: formErrors.accessToken }"
+            />
+          </div>
+
+          <hr class="divider">
+
+          <div class="form-group">
+            <label>Webhook URL <small style="color:#888;">（LINE Developersに設定してください）</small></label>
+            <div class="webhook-box">
+              <code>{{ webhookUrl }}</code>
+              <button class="copy-btn" :class="{ copied: copied }" @click="copyWebhookUrl">
+                {{ copied ? '✓ Copied!' : '📋 Copy' }}
+              </button>
+            </div>
+            <small style="color:#888; font-size:11px; margin-top:6px; display:block;">
+              LINE Developers > Messaging API > Webhook settings でこのURLを設定し、Use webhookをONにしてください
+            </small>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-primary" @click="saveSettings" :disabled="saving">
+              <span v-if="saving" class="spinner"></span>
+              <span v-else>💾</span>
+              {{ saving ? '保存中...' : '保存' }}
+            </button>
+            <button class="btn btn-secondary" @click="testConnection" :disabled="testing">
+              <span v-if="testing" class="spinner" style="border-top-color:#666;"></span>
+              <span v-else>🔍</span>
+              {{ testing ? '確認中...' : '接続テスト' }}
+            </button>
+            <button v-if="status.lineConnected" class="btn btn-danger" @click="disconnectLine">
+              🗑 接続解除
+            </button>
+          </div>
+
+          <div v-if="testResult" class="alert" :class="testResult.valid ? 'alert-success' : 'alert-error'" style="margin-top:12px;">
+            <span>{{ testResult.valid ? '✅' : '❌' }}</span>
+            <div v-if="testResult.valid">
+              接続テスト成功！友だち数: {{ testResult.friendsCount?.toLocaleString() || 0 }}
+            </div>
+            <div v-else>{{ testResult.error }}</div>
+          </div>
+        </div>
+
+        <!-- コンタクトマッピング設定 -->
+        <div class="card">
+          <div class="card-title">コンタクトマッピング設定</div>
+          <div class="alert alert-info" style="margin-bottom:0;">
+            <span>ℹ️</span>
+            <div>
+              <strong>自動設定済み:</strong> 以下の動作がデフォルトで有効になっています:
+              <ul style="margin-top:8px; padding-left:16px; line-height:1.8;">
+                <li>友だち追加時にGHLコンタクトを自動作成</li>
+                <li>カスタムフィールド <code>line_uid</code> にLINE UIDを保存</li>
+                <li>「LINE友だち」タグを自動付与</li>
+                <li>メッセージ受信時にコンタクトが存在しない場合は自動作成</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- ワークフロー設定ガイド -->
+        <div class="card">
+          <div class="card-title">GHLワークフロー設定</div>
+          <div style="font-size:13px; color:#444; line-height:1.8;">
+            <p style="margin-bottom:12px;"><strong>利用可能なカスタムトリガー:</strong></p>
+            <ul style="padding-left:16px; margin-bottom:16px;">
+              <li>🟢 <strong>LINE Friend Added</strong> — 友だち追加されたとき</li>
+              <li>🟢 <strong>LINE Message Received</strong> — テキストメッセージを受信したとき</li>
+            </ul>
+            <p style="margin-bottom:12px;"><strong>利用可能なカスタムアクション:</strong></p>
+            <ul style="padding-left:16px;">
+              <li>🟢 <strong>Send LINE Text</strong> — テキストメッセージ送信</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 送受信ログ -->
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <div class="card-title" style="margin-bottom:0;">メッセージログ（直近20件）</div>
+            <button class="btn btn-secondary" @click="loadLogs" style="padding:6px 12px; font-size:12px;">
+              🔄 更新
+            </button>
+          </div>
+
+          <div v-if="logs.length === 0" style="text-align:center; padding:24px; color:#888; font-size:13px;">
+            まだメッセージログがありません
+          </div>
+          <table v-else class="logs-table">
+            <thead>
+              <tr>
+                <th>時刻</th>
+                <th>方向</th>
+                <th>種別</th>
+                <th>内容</th>
+                <th>ステータス</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="log in logs" :key="log.id">
+                <td style="color:#888; white-space:nowrap;">{{ formatDate(log.created_at) }}</td>
+                <td>
+                  <span :class="['direction-badge', log.direction === 'inbound' ? 'direction-in' : 'direction-out']">
+                    {{ log.direction === 'inbound' ? '受信' : '送信' }}
+                  </span>
+                </td>
+                <td>{{ log.message_type }}</td>
+                <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                  {{ log.content || '—' }}
+                </td>
+                <td :class="'status-' + log.status">{{ log.status }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </template>
+    </div>
+  </div>
+
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          loading: true,
+          initError: null,
+          locationId: null,
+          saving: false,
+          testing: false,
+          saveSuccess: false,
+          saveError: null,
+          testResult: null,
+          copied: false,
+          webhookUrl: '',
+          logs: [],
+          status: {
+            ghlConnected: false,
+            lineConnected: false,
+            friendsCount: 0,
+            channelId: null,
+            lastWebhookAt: null,
+          },
+          form: {
+            channelId: '',
+            channelSecret: '',
+            accessToken: '',
+          },
+          formErrors: {
+            channelId: false,
+            channelSecret: false,
+            accessToken: false,
+          },
+        };
+      },
+
+      async mounted() {
+        await this.init();
+      },
+
+      methods: {
+        async init() {
+          this.loading = true;
+          try {
+            // Get locationId from URL param (when GHL loads the page in iframe)
+            const params = new URLSearchParams(window.location.search);
+            let locationId = params.get('locationId');
+
+            // If no locationId in URL, try to decrypt GHL SSO userData
+            if (!locationId) {
+              const userData = params.get('userData');
+              if (userData) {
+                const res = await fetch('/api/settings/decrypt-sso', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ userData }),
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  locationId = data.locationId;
+                }
+              }
+            }
+
+            if (!locationId) {
+              this.initError = 'Location ID not found. Please access this page from GoHighLevel.';
+              return;
+            }
+
+            this.locationId = locationId;
+            await this.loadStatus();
+            await this.loadLogs();
+          } catch (err) {
+            this.initError = err.message;
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        async loadStatus() {
+          const res = await fetch(`/api/settings/status?locationId=${this.locationId}`);
+          if (!res.ok) throw new Error('Failed to load status');
+          const data = await res.json();
+          this.status = data;
+          this.webhookUrl = data.webhookUrl || `${window.location.origin}/webhook/${this.locationId}`;
+        },
+
+        async loadLogs() {
+          try {
+            const res = await fetch(`/api/settings/logs?locationId=${this.locationId}&limit=20`);
+            if (res.ok) {
+              const data = await res.json();
+              this.logs = data.logs || [];
+            }
+          } catch {}
+        },
+
+        async saveSettings() {
+          this.saveSuccess = false;
+          this.saveError = null;
+          this.formErrors = { channelId: false, channelSecret: false, accessToken: false };
+
+          // Validation
+          let hasError = false;
+          if (!this.form.channelId.trim()) { this.formErrors.channelId = true; hasError = true; }
+          if (!this.form.channelSecret.trim()) { this.formErrors.channelSecret = true; hasError = true; }
+          if (!this.form.accessToken.trim()) { this.formErrors.accessToken = true; hasError = true; }
+          if (hasError) return;
+
+          this.saving = true;
+          try {
+            const res = await fetch('/api/settings/line-connect', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                locationId: this.locationId,
+                channelId: this.form.channelId.trim(),
+                channelSecret: this.form.channelSecret.trim(),
+                accessToken: this.form.accessToken.trim(),
+              }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Save failed');
+
+            this.saveSuccess = true;
+            this.status.lineConnected = true;
+            this.status.friendsCount = data.friendsCount || 0;
+            this.status.channelId = this.form.channelId.trim();
+            this.webhookUrl = data.webhookUrl || this.webhookUrl;
+            this.form.channelSecret = '';
+            this.form.accessToken = '';
+          } catch (err) {
+            this.saveError = err.message;
+          } finally {
+            this.saving = false;
+          }
+        },
+
+        async testConnection() {
+          this.testResult = null;
+          this.testing = true;
+          try {
+            const body = this.form.accessToken
+              ? { accessToken: this.form.accessToken.trim(), channelId: this.form.channelId.trim() }
+              : { locationId: this.locationId };
+
+            const res = await fetch('/api/settings/line-test', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            });
+            this.testResult = await res.json();
+          } catch (err) {
+            this.testResult = { valid: false, error: err.message };
+          } finally {
+            this.testing = false;
+          }
+        },
+
+        async disconnectLine() {
+          if (!confirm('LINE接続を解除しますか？\nワークフローのLINEアクションが動作しなくなります。')) return;
+
+          try {
+            const res = await fetch('/api/settings/line-connect', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ locationId: this.locationId }),
+            });
+            if (res.ok) {
+              this.status.lineConnected = false;
+              this.status.channelId = null;
+              this.status.friendsCount = 0;
+            }
+          } catch (err) {
+            alert('Error: ' + err.message);
+          }
+        },
+
+        copyWebhookUrl() {
+          navigator.clipboard.writeText(this.webhookUrl).then(() => {
+            this.copied = true;
+            setTimeout(() => { this.copied = false; }, 2000);
+          });
+        },
+
+        formatDate(dateStr) {
+          if (!dateStr) return '—';
+          const d = new Date(dateStr);
+          return d.toLocaleString('ja-JP', {
+            month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit',
+          });
+        },
+
+        formatRelativeTime(dateStr) {
+          if (!dateStr) return '—';
+          const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+          if (diff < 60) return `${Math.floor(diff)}秒前`;
+          if (diff < 3600) return `${Math.floor(diff / 60)}分前`;
+          if (diff < 86400) return `${Math.floor(diff / 3600)}時間前`;
+          return `${Math.floor(diff / 86400)}日前`;
+        },
+      },
+    }).mount('#app');
+  </script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{
+  "name": "line-connect-for-ghl",
+  "version": "1.0.0",
+  "description": "LINE Connect for GoHighLevel - Marketplace App Server",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "migrate": "node src/scripts/migrate.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@line/bot-sdk": "^9.4.0",
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.9"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
