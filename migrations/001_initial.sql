@@ -87,14 +87,17 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS update_ghl_connections_updated_at ON ghl_connections;
 CREATE TRIGGER update_ghl_connections_updated_at
   BEFORE UPDATE ON ghl_connections
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_line_connections_updated_at ON line_connections;
 CREATE TRIGGER update_line_connections_updated_at
   BEFORE UPDATE ON line_connections
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_line_contacts_updated_at ON line_contacts;
 CREATE TRIGGER update_line_contacts_updated_at
   BEFORE UPDATE ON line_contacts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
