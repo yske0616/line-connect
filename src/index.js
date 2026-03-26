@@ -35,8 +35,15 @@ app.use(cors({
   ].filter(Boolean),
   credentials: true,
 }));
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true }));
+// /webhook はrawBodyを手動読込済みのためexpress.jsonをスキップ
+app.use((req, res, next) => {
+  if (req.path.startsWith('/webhook')) return next();
+  express.json({ limit: '1mb' })(req, res, next);
+});
+app.use((req, res, next) => {
+  if (req.path.startsWith('/webhook')) return next();
+  express.urlencoded({ extended: true })(req, res, next);
+});
 
 // ─── Static files (settings UI) ───────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '..', 'ui')));
