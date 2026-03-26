@@ -53,7 +53,9 @@ async function loadLineConnection(req, res, next) {
     const conn = await lineConnectionModel.findByLocationId(locationId);
     if (!conn) {
       console.warn(`[LineSignature] No LINE connection found for location: ${locationId}`);
-      return res.status(404).json({ error: 'LINE connection not configured for this location' });
+      // LINE の Webhook Verify リクエストは認証情報未設定でも 200 を返す
+      // （LINE は 200 が返れば Verify 成功と判断する）
+      return res.status(200).json({ status: 'ok', message: 'LINE not configured yet' });
     }
 
     req.lineConnection = conn;
