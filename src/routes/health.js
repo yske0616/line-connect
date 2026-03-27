@@ -22,6 +22,11 @@ router.get('/', async (req, res) => {
     health.status = 'degraded';
   }
 
+  // Conversation Provider 設定確認
+  health.conversationProvider = process.env.GHL_CONVERSATION_PROVIDER_ID
+    ? 'configured'
+    : 'NOT SET ⚠️';
+
   const statusCode = health.status === 'ok' ? 200 : 503;
   res.status(statusCode).json(health);
 });
