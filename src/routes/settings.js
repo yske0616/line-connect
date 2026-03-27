@@ -7,10 +7,14 @@ const lineService = require('../services/line');
 const logModel = require('../models/log');
 
 /**
- * GET /settings
+ * GET / または GET /settings
  * Serves the settings page HTML (loaded inside GHL as a custom page/iframe)
  */
 router.get('/', (req, res) => {
+  res.sendFile('index.html', { root: 'ui' });
+});
+
+router.get('/settings', (req, res) => {
   res.sendFile('index.html', { root: 'ui' });
 });
 
