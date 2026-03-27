@@ -140,6 +140,13 @@ async function handleMessage(locationId, lineAccessToken, userId, messageText, r
       displayName,
       pictureUrl,
     });
+  } else {
+    // 既存コンタクトにも毎回タグを付与（手動削除後も復元される）
+    try {
+      await ghlService.addTags(locationId, ghlContactId, [LINE_FRIEND_TAG]);
+    } catch (err) {
+      console.error('[ContactMapper] Failed to re-add tag for existing contact:', err.message);
+    }
   }
 
   // 3. Log the message
