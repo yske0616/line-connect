@@ -233,6 +233,62 @@ async function fireTrigger(targetUrl, payload) {
   return res.data;
 }
 
+/**
+ * Add an inbound message to GHL Unified Inbox (Conversation Provider)
+ * Called when a LINE user sends a message — posts it into the GHL Conversations inbox.
+ *
+ * @param {string} locationId - GHL location ID
+ * @param {string} contactId  - GHL contact ID
+ * @param {string} body       - Message text
+ * @param {string} [altId]    - LINE message ID (echoed back in outbound webhook as replyToAltId)
+ * @returns {{ messageId: string, conversationId: string }}
+ */
+async function addInboundMessage(locationId, contactId, body, altId) {
+  const providerId = process.env.GHL_CONVERSATION_PROVIDER_ID;
+  if (!providerId) {
+    throw new Error('GHL_CONVERSATION_PROVIDER_ID is not configured');
+  }
+
+  const token = await getValidToken(locationId);
+  const payload = {
+    type: 'Custom',
+    contactId,
+    locationId,
+    body,
+    conversationProviderId: providerId,
+    direction: 'inbound',
+    contentType: 'text/plain',
+    dateAdded: new Date().toISOString(),
+  };
+
+  if (altId) payload.altId = altId;
+
+  const res = await axios.post(
+    `${GHL_API_BASE}/conversations/messages/inbound`,
+    payload,
+    { headers: buildHeaders(token) }
+  );
+  return res.data;
+}
+
+/**
+ * Update the delivery status of a GHL conversation message.
+ * Must be called after attempting to deliver an outbound message to LINE.
+ *
+ * @param {string} locationId - GHL location ID
+ * @param {string} messageId  - GHL message ID (from outbound webhook payload)
+ * @param {'pending'|'delivered'|'read'|'failed'} status
+ */
+async function updateMessageStatus(locationId, messageId, status) {
+  const token = await getValidToken(locationId);
+  const res = await axios.put(
+    `${GHL_API_BASE}/conversations/messages/${messageId}/status`,
+    { status },
+    { headers: buildHeaders(token) }
+  );
+  return res.data;
+}
+
 module.exports = {
   exchangeCodeForTokens,
   refreshAccessToken,
@@ -248,4 +304,6 @@ module.exports = {
   createCustomField,
   ensureLineUidField,
   fireTrigger,
+  addInboundMessage,
+  updateMessageStatus,
 };

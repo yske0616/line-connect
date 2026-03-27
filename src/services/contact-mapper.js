@@ -160,7 +160,14 @@ async function handleMessage(locationId, lineAccessToken, userId, messageText, r
     status: 'received',
   });
 
-  // 4. Fire "LINE Message Received" custom trigger
+  // 4. Post message to GHL Unified Inbox (Conversation Provider)
+  if (ghlContactId && process.env.GHL_CONVERSATION_PROVIDER_ID) {
+    ghlService.addInboundMessage(locationId, ghlContactId, messageText).catch((err) => {
+      console.error('[ContactMapper] Failed to post message to GHL Unified Inbox:', err.message);
+    });
+  }
+
+  // 5. Fire "LINE Message Received" custom trigger
   await fireCustomTrigger(locationId, 'line_message_received', {
     userId,
     displayName: lineContact?.display_name || userId,
