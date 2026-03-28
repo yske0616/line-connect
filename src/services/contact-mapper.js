@@ -10,12 +10,16 @@ const LINE_FRIEND_TAG = 'LINE友だち';
  * Handle a LINE follow event (friend added)
  * 1. Get LINE user profile
  * 2. Find or create GHL contact
+ *    - refContactId がある場合: 既存コンタクトに LINE UID を紐づけ（新規作成しない）
+ *    - refContactId がない場合: 新規コンタクトを作成
  * 3. Save line_uid mapping
  * 4. Add "LINE友だち" tag
  * 5. Fire GHL custom trigger "line_friend_added"
+ *
+ * @param {string} refContactId - GHL contact ID passed via LINE add friend URL (?ref=contactId)
  */
-async function handleFollow(locationId, lineAccessToken, userId, timestamp) {
-  console.log(`[ContactMapper] Follow event: location=${locationId}, user=${userId}`);
+async function handleFollow(locationId, lineAccessToken, userId, timestamp, refContactId = null) {
+  console.log(`[ContactMapper] Follow event: location=${locationId}, user=${userId}, ref=${refContactId || 'none'}`);
 
   // 1. Get LINE user profile
   let profile;
@@ -32,28 +36,49 @@ async function handleFollow(locationId, lineAccessToken, userId, timestamp) {
   let lineContact = await contactModel.findByLineUid(locationId, userId);
   let ghlContactId = lineContact?.ghl_contact_id;
 
-  // 3. If not mapped, try to find existing GHL contact or create one
+  // 3. Determine the GHL contact to link to
   if (!ghlContactId) {
-    // Try to find by existing contact (no email/phone for LINE follow - create new)
-    try {
-      const nameParts = displayName.split(' ');
-      const firstName = nameParts[0] || displayName;
-      const lastName = nameParts.slice(1).join(' ') || '';
+    if (refContactId) {
+      // --- パターン A: ref パラメータあり → 既存コンタクトに紐づける ---
+      try {
+        const existingContact = await ghlService.getContact(locationId, refContactId);
+        if (existingContact) {
+          ghlContactId = refContactId;
+          await ghlService.addTags(locationId, ghlContactId, [LINE_FRIEND_TAG]);
+          await ghlService.updateCustomFields(locationId, ghlContactId, [
+            { key: 'line_uid', field_value: userId },
+          ]);
+          console.log(`[ContactMapper] ✅ Linked LINE UID to existing contact via ref: ${ghlContactId}`);
+        } else {
+          console.warn(`[ContactMapper] ref contact not found in GHL: ${refContactId}, will create new`);
+        }
+      } catch (err) {
+        console.error('[ContactMapper] Failed to link ref contact:', err.message);
+      }
+    }
 
-      const newContact = await ghlService.createContact(locationId, {
-        firstName,
-        lastName,
-        tags: [LINE_FRIEND_TAG],
-        customFields: [{ key: 'line_uid', field_value: userId }],
-      });
+    if (!ghlContactId) {
+      // --- パターン B: ref なし / ref 解決失敗 → 新規コンタクト作成 ---
+      try {
+        const nameParts = displayName.split(' ');
+        const firstName = nameParts[0] || displayName;
+        const lastName = nameParts.slice(1).join(' ') || '';
 
-      ghlContactId = newContact.id || newContact.contact?.id;
-      console.log(`[ContactMapper] Created GHL contact: ${ghlContactId}`);
-    } catch (err) {
-      console.error('[ContactMapper] Failed to create GHL contact:', err.message);
+        const newContact = await ghlService.createContact(locationId, {
+          firstName,
+          lastName,
+          tags: [LINE_FRIEND_TAG],
+          customFields: [{ key: 'line_uid', field_value: userId }],
+        });
+
+        ghlContactId = newContact.id || newContact.contact?.id;
+        console.log(`[ContactMapper] Created new GHL contact: ${ghlContactId}`);
+      } catch (err) {
+        console.error('[ContactMapper] Failed to create GHL contact:', err.message);
+      }
     }
   } else {
-    // Update existing contact: add tag + update line_uid field
+    // 既にマッピング済み → タグ・フィールドだけ更新
     try {
       await ghlService.addTags(locationId, ghlContactId, [LINE_FRIEND_TAG]);
       await ghlService.updateCustomFields(locationId, ghlContactId, [

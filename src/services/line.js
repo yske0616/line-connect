@@ -97,4 +97,16 @@ async function replyMessage(accessToken, replyToken, text) {
   return res.data;
 }
 
-module.exports = { getUserProfile, sendTextMessage, getFriendCount, verifyToken, replyMessage };
+/**
+ * Get LINE bot info (includes basicId for constructing add-friend URLs)
+ * @param {string} accessToken
+ * @returns {{ userId, basicId, displayName, pictureUrl }}
+ */
+async function getBotInfo(accessToken) {
+  const res = await axios.get(`${LINE_API_BASE}/v2/bot/info`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data; // { userId, basicId, displayName, pictureUrl, chatMode, markAsReadMode }
+}
+
+module.exports = { getUserProfile, sendTextMessage, getFriendCount, verifyToken, replyMessage, getBotInfo };

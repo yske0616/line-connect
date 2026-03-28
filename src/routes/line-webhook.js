@@ -55,10 +55,15 @@ async function processEvent(locationId, lineAccessToken, event) {
   const timestamp = event.timestamp ? new Date(event.timestamp).toISOString() : new Date().toISOString();
 
   switch (event.type) {
-    case 'follow':
-      // User added the bot as a friend
-      await contactMapper.handleFollow(locationId, lineAccessToken, userId, timestamp);
+    case 'follow': {
+      // referral.ref には GHL contactId が入る（友だち追加 URL に ?ref={contactId} を付けた場合）
+      const refContactId = event.referral?.ref || null;
+      if (refContactId) {
+        console.log(`[LineWebhook] Follow event with ref: contactId=${refContactId}`);
+      }
+      await contactMapper.handleFollow(locationId, lineAccessToken, userId, timestamp, refContactId);
       break;
+    }
 
     case 'message':
       // User sent a message

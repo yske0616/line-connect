@@ -187,6 +187,62 @@ router.get('/api/settings/logs', async (req, res) => {
 });
 
 /**
+ * GET /api/settings/line-add-url
+ * GHL contactId をパラメータとして受け取り、
+ * その contactId を ref に埋め込んだ LINE 友だち追加 URL を返す。
+ *
+ * GHL ワークフロー / ファネルのサンクスページで使用:
+ *   URL 例: https://line.me/R/ti/p/@xxxxx?ref={{contact.id}}
+ *
+ * Query params:
+ *   ?locationId=xxx&contactId=xxx
+ */
+router.get('/api/settings/line-add-url', async (req, res) => {
+  const { locationId, contactId } = req.query;
+
+  if (!locationId) {
+    return res.status(400).json({ error: 'Missing locationId' });
+  }
+
+  try {
+    const lineConn = await lineConnectionModel.findByLocationId(locationId);
+    if (!lineConn) {
+      return res.status(404).json({ error: 'LINE not configured for this location' });
+    }
+
+    // LINE bot info から basicId (@xxx) を取得
+    const botInfo = await lineService.getBotInfo(lineConn.access_token);
+    const basicId = botInfo.basicId; // 例: "@abc1234"
+
+    if (!basicId) {
+      return res.status(500).json({ error: 'Could not retrieve LINE bot basicId' });
+    }
+
+    // basicId から @ を除いた文字列で URL を構築
+    const cleanId = basicId.startsWith('@') ? basicId.slice(1) : basicId;
+    const baseAddUrl = `https://line.me/R/ti/p/@${cleanId}`;
+
+    // contactId が指定されている場合は ref パラメータを付与
+    const addUrl = contactId
+      ? `${baseAddUrl}?ref=${encodeURIComponent(contactId)}`
+      : baseAddUrl;
+
+    res.json({
+      url: addUrl,
+      baseUrl: baseAddUrl,
+      basicId,
+      contactId: contactId || null,
+      usage: 'GHL ワークフローのリダイレクト URL や Webhook Action の URL にそのまま使用できます。' +
+             ' ファネルでは {{contact.id}} をそのまま ref パラメータに埋め込んでください。' +
+             ' 例: ' + baseAddUrl + '?ref={{contact.id}}',
+    });
+  } catch (err) {
+    console.error('[Settings] Failed to generate LINE add URL:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * Build the Webhook URL for a location
  */
 function buildWebhookUrl(locationId, req) {
