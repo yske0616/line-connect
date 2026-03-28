@@ -251,10 +251,11 @@ async function addInboundMessage(locationId, contactId, body, altId) {
 
   const token = await getValidToken(locationId);
   const payload = {
-    type: 'SMS',
+    type: 'Custom',
     contactId,
     locationId,
     body,
+    message: body,   // GHL の Custom type はどちらのフィールドを使うか不明なため両方送る
     conversationProviderId: providerId,
     direction: 'inbound',
     contentType: 'text/plain',
