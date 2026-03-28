@@ -251,8 +251,7 @@ async function addInboundMessage(locationId, contactId, body, altId) {
 
   const token = await getValidToken(locationId);
   const payload = {
-    type: 'Custom',
-    messageType: 'Custom',
+    type: 'SMS',
     contactId,
     locationId,
     body,
