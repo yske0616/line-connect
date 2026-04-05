@@ -56,6 +56,7 @@ const actionsRouter = require('./routes/ghl-actions');
 const triggersRouter = require('./routes/ghl-triggers');
 const settingsRouter = require('./routes/settings');
 const conversationsRouter = require('./routes/conversations');
+const addFriendRouter = require('./routes/add-friend');
 
 app.use('/health', healthRouter);
 app.use('/oauth', oauthRouter);
@@ -63,6 +64,7 @@ app.use('/webhook', webhookRouter);
 app.use('/actions', actionsRouter);
 app.use('/triggers', triggersRouter);
 app.use('/conversations', conversationsRouter);
+app.use('/add-friend', addFriendRouter);
 app.use('/', settingsRouter);
 
 // ─── 404 handler ──────────────────────────────────────────────────────────
