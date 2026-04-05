@@ -199,9 +199,6 @@ router.post('/api/settings/ghl-token', async (req, res) => {
   }
 
   try {
-    const { default: ghlConnectionModel } = await Promise.resolve().then(() =>
-      require('../models/ghl-connection')
-    );
     // Private Integration キーは有効期限なし（100年後を設定）
     await ghlConnectionModel.upsert({
       locationId,
