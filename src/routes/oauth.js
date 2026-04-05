@@ -12,6 +12,9 @@ const ghlHelper = require('../services/ghl');
 router.get('/authorize', (req, res) => {
   const { locationId, companyId } = req.query;
 
+  // GHL app version ID = app client ID の最初の部分（ハイフン以前）
+  const appVersionId = (process.env.GHL_APP_CLIENT_ID || '').split('-')[0];
+
   const params = new URLSearchParams({
     response_type: 'code',
     redirect_uri: process.env.GHL_APP_REDIRECT_URI,
@@ -25,6 +28,7 @@ router.get('/authorize', (req, res) => {
       'locations/customFields.readonly',
       'locations/customFields.write',
     ].join(' '),
+    ...(appVersionId && { appVersionId }),
   });
 
   const authUrl = `https://marketplace.gohighlevel.com/oauth/chooselocation?${params.toString()}`;
