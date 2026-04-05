@@ -276,7 +276,7 @@ router.get('/api/settings/line-add-url', async (req, res) => {
  * Build the Webhook URL for a location
  */
 function buildWebhookUrl(locationId, req) {
-  const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+  const baseUrl = (process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
   return `${baseUrl}/webhook/${locationId}`;
 }
 
