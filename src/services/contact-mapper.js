@@ -32,11 +32,18 @@ async function handleFollow(locationId, lineAccessToken, userId, timestamp, refC
 
   const { displayName, pictureUrl } = profile;
 
-  // 2. Check if we already have this LINE user mapped
+  // 2. line_uid カスタムフィールドの ID を取得（なければ自動作成）
+  const lineUidField = await ghlService.ensureLineUidField(locationId);
+  // GHL API は { id: fieldId, field_value } 形式を要求する
+  const lineUidCustomField = lineUidField.id
+    ? { id: lineUidField.id, field_value: userId }
+    : { key: lineUidField.fieldKey, field_value: userId }; // id が取れない場合は key でフォールバック
+
+  // 3. Check if we already have this LINE user mapped
   let lineContact = await contactModel.findByLineUid(locationId, userId);
   let ghlContactId = lineContact?.ghl_contact_id;
 
-  // 3. Determine the GHL contact to link to
+  // 4. Determine the GHL contact to link to
   if (!ghlContactId) {
     if (refContactId) {
       // --- パターン A: ref パラメータあり → 既存コンタクトに紐づける ---
@@ -45,9 +52,7 @@ async function handleFollow(locationId, lineAccessToken, userId, timestamp, refC
         if (existingContact) {
           ghlContactId = refContactId;
           await ghlService.addTags(locationId, ghlContactId, [LINE_FRIEND_TAG]);
-          await ghlService.updateCustomFields(locationId, ghlContactId, [
-            { key: 'line_uid', field_value: userId },
-          ]);
+          await ghlService.updateCustomFields(locationId, ghlContactId, [lineUidCustomField]);
           console.log(`[ContactMapper] ✅ Linked LINE UID to existing contact via ref: ${ghlContactId}`);
         } else {
           console.warn(`[ContactMapper] ref contact not found in GHL: ${refContactId}, will create new`);
@@ -68,7 +73,7 @@ async function handleFollow(locationId, lineAccessToken, userId, timestamp, refC
           firstName,
           lastName,
           tags: [LINE_FRIEND_TAG],
-          customFields: [{ key: 'line_uid', field_value: userId }],
+          customFields: [lineUidCustomField],
         });
 
         ghlContactId = newContact.id || newContact.contact?.id;
@@ -81,9 +86,7 @@ async function handleFollow(locationId, lineAccessToken, userId, timestamp, refC
     // 既にマッピング済み → タグ・フィールドだけ更新
     try {
       await ghlService.addTags(locationId, ghlContactId, [LINE_FRIEND_TAG]);
-      await ghlService.updateCustomFields(locationId, ghlContactId, [
-        { key: 'line_uid', field_value: userId },
-      ]);
+      await ghlService.updateCustomFields(locationId, ghlContactId, [lineUidCustomField]);
     } catch (err) {
       console.error('[ContactMapper] Failed to update GHL contact:', err.message);
     }

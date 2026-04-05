@@ -198,25 +198,34 @@ async function createCustomField(locationId, { name, fieldKey, dataType }) {
 
 /**
  * Ensure the line_uid custom field exists for a location
- * Returns the field key to use in customFields arrays
+ * Returns { id, fieldKey } to use in customFields update arrays
  */
 async function ensureLineUidField(locationId) {
   try {
     const fields = await getCustomFields(locationId);
     const existing = fields.find(
-      (f) => f.fieldKey === 'line_uid' || f.name === 'LINE UID'
+      (f) =>
+        f.fieldKey === 'line_uid' ||
+        f.fieldKey === 'contact.line_uid' ||
+        f.name === 'LINE UID' ||
+        f.name === 'line_uid'
     );
-    if (existing) return existing.fieldKey || 'line_uid';
 
-    await createCustomField(locationId, {
+    if (existing) {
+      return { id: existing.id, fieldKey: existing.fieldKey || 'line_uid' };
+    }
+
+    // フィールドが存在しない場合は作成
+    const created = await createCustomField(locationId, {
       name: 'LINE UID',
       fieldKey: 'line_uid',
       dataType: 'TEXT',
     });
-    return 'line_uid';
+    const newField = created?.customField || created;
+    return { id: newField?.id || null, fieldKey: 'line_uid' };
   } catch (err) {
     console.error('[GHL] Failed to ensure line_uid custom field:', err.message);
-    return 'line_uid'; // Fall back to expected key
+    return { id: null, fieldKey: 'line_uid' };
   }
 }
 
