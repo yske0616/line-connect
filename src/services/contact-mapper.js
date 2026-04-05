@@ -52,7 +52,16 @@ async function handleFollow(locationId, lineAccessToken, userId, timestamp, refC
         if (existingContact) {
           ghlContactId = refContactId;
           await ghlService.addTags(locationId, ghlContactId, [LINE_FRIEND_TAG]);
-          await ghlService.updateCustomFields(locationId, ghlContactId, [lineUidCustomField]);
+
+          // 名前が空なら LINE の表示名で補完
+          const updates = { customFields: [lineUidCustomField] };
+          if (!existingContact.firstName && !existingContact.lastName && displayName) {
+            const nameParts = displayName.split(' ');
+            updates.firstName = nameParts[0] || displayName;
+            updates.lastName = nameParts.slice(1).join(' ') || '';
+            console.log(`[ContactMapper] Filling name from LINE profile: ${displayName}`);
+          }
+          await ghlService.updateContact(locationId, ghlContactId, updates);
           console.log(`[ContactMapper] ✅ Linked LINE UID to existing contact via ref: ${ghlContactId}`);
         } else {
           console.warn(`[ContactMapper] ref contact not found in GHL: ${refContactId}, will create new`);
