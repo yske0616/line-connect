@@ -109,4 +109,70 @@ async function getBotInfo(accessToken) {
   return res.data; // { userId, basicId, displayName, pictureUrl, chatMode, markAsReadMode }
 }
 
-module.exports = { getUserProfile, sendTextMessage, getFriendCount, verifyToken, replyMessage, getBotInfo };
+/**
+ * Send an image message to a LINE user (Push Message)
+ * @param {string} accessToken - LINE Channel Access Token
+ * @param {string} userId - LINE User ID
+ * @param {string} originalContentUrl - Full-size image URL (HTTPS, max 10MB, JPEG/PNG)
+ * @param {string} previewImageUrl - Preview image URL (HTTPS, max 1MB, JPEG/PNG). Defaults to originalContentUrl.
+ * @returns {{ messageId: string }}
+ */
+async function sendImageMessage(accessToken, userId, originalContentUrl, previewImageUrl) {
+  const res = await axios.post(
+    `${LINE_API_BASE}/v2/bot/message/push`,
+    {
+      to: userId,
+      messages: [
+        {
+          type: 'image',
+          originalContentUrl,
+          previewImageUrl: previewImageUrl || originalContentUrl,
+        },
+      ],
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+  return {
+    messageId: res.data?.messages?.[0]?.id || 'sent',
+  };
+}
+
+/**
+ * Send a Flex Message to a LINE user (Push Message)
+ * @param {string} accessToken - LINE Channel Access Token
+ * @param {string} userId - LINE User ID
+ * @param {string} altText - Alternative text shown in notifications (required, max 400 chars)
+ * @param {object} contents - Flex Message container object (bubble or carousel)
+ * @returns {{ messageId: string }}
+ */
+async function sendFlexMessage(accessToken, userId, altText, contents) {
+  const res = await axios.post(
+    `${LINE_API_BASE}/v2/bot/message/push`,
+    {
+      to: userId,
+      messages: [
+        {
+          type: 'flex',
+          altText,
+          contents,
+        },
+      ],
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+  return {
+    messageId: res.data?.messages?.[0]?.id || 'sent',
+  };
+}
+
+module.exports = { getUserProfile, sendTextMessage, sendImageMessage, sendFlexMessage, getFriendCount, verifyToken, replyMessage, getBotInfo };
