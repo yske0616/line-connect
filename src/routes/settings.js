@@ -187,6 +187,39 @@ router.get('/api/settings/logs', async (req, res) => {
 });
 
 /**
+ * POST /api/settings/ghl-token
+ * GHL Private Integration API キーを直接登録する
+ * OAuth が使えない Draft アプリ開発中に使用
+ * Body: { locationId, apiKey }
+ */
+router.post('/api/settings/ghl-token', async (req, res) => {
+  const { locationId, apiKey } = req.body;
+  if (!locationId || !apiKey) {
+    return res.status(400).json({ error: 'Missing locationId or apiKey' });
+  }
+
+  try {
+    const { default: ghlConnectionModel } = await Promise.resolve().then(() =>
+      require('../models/ghl-connection')
+    );
+    // Private Integration キーは有効期限なし（100年後を設定）
+    await ghlConnectionModel.upsert({
+      locationId,
+      companyId: null,
+      accessToken: apiKey,
+      refreshToken: apiKey, // refresh 不要だが空にしない
+      expiresIn: 60 * 60 * 24 * 365 * 100, // 100 years
+    });
+
+    console.log(`[Settings] GHL Private Integration key saved for location: ${locationId}`);
+    res.json({ status: 'ok', locationId, message: 'API key saved successfully' });
+  } catch (err) {
+    console.error('[Settings] Failed to save GHL token:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/settings/line-add-url
  * GHL contactId をパラメータとして受け取り、
  * その contactId を ref に埋め込んだ LINE 友だち追加 URL を返す。
